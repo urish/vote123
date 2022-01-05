@@ -1,5 +1,5 @@
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { collection, getFirestore } from 'firebase/firestore';
+import { collection, doc, getFirestore, updateDoc } from 'firebase/firestore';
 import Head from 'next/head';
 import { useEffect, useState } from 'react';
 import {
@@ -32,10 +32,40 @@ function UserInfo() {
   );
 }
 
+function FeatureItem({ feature }) {
+  const { data: user } = useUser();
+  const firestore = useFirestore();
+  const featuresCollection = collection(firestore, 'features');
+  const votes = feature.votes ?? [];
+  const voted = user && votes.includes(user.uid);
+
+  const vote = (feature) => {
+    updateDoc(doc(featuresCollection, feature.id), {
+      votes: [...votes, user.uid],
+    });
+  };
+  const unvote = (feature) => {
+    updateDoc(doc(featuresCollection, feature.id), {
+      votes: votes.filter((item) => item !== user.uid),
+    });
+  };
+
+  return (
+    <div>
+      {feature.title}
+      Votes: {feature.votes?.length ?? 0}
+      {user && !voted && <button onClick={() => vote(feature)}>Vote</button>}
+      {user && voted && <button onClick={() => unvote(feature)}>Unvote</button>}
+    </div>
+  );
+}
+
 function VoteList() {
   const firestore = useFirestore();
   const featuresCollection = collection(firestore, 'features');
-  const { status, data: features } = useFirestoreCollectionData(featuresCollection);
+  const { status, data: features } = useFirestoreCollectionData(featuresCollection, {
+    idField: 'id',
+  });
 
   if (status === 'loading') {
     return <div>Loading...</div>;
@@ -44,7 +74,9 @@ function VoteList() {
   return (
     <ul>
       {features.map((feature) => (
-        <li key={feature.title}>{feature.title}</li>
+        <li key={feature.id}>
+          <FeatureItem feature={feature} />
+        </li>
       ))}
     </ul>
   );
